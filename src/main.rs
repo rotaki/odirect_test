@@ -8,7 +8,7 @@ use std::fs::OpenOptions;
 use std::io::{self, Read, Write};
 use std::os::unix::fs::OpenOptionsExt;
 
-fn test1() -> io::Result<()> {
+fn test1() {
     let block_size = 4096;
     let time = unsafe { libc::time(ptr::null_mut()) };
     let path = format!("testfile1_{}", time);
@@ -19,7 +19,8 @@ fn test1() -> io::Result<()> {
         .write(true)
         .create(true)
         .custom_flags(libc::O_DIRECT)
-        .open(&path)?;
+        .open(&path)
+        .unwrap();
 
     // Allocate aligned buffer
     let mut buf = vec![0u8; block_size];
@@ -39,23 +40,22 @@ fn test1() -> io::Result<()> {
     }
 
     // Write data
-    file.write_all(&buf)?; // This may not work as expected
+    file.write_all(&buf).unwrap(); // This may not work as expected
 
     // Seek to the beginning
-    file.seek(io::SeekFrom::Start(0))?;
+    file.seek(io::SeekFrom::Start(0)).unwrap();
 
     // Read data
     let mut read_buf = vec![0u8; block_size];
-    file.read_exact(&mut read_buf)?; // This may not work as expected
+    file.read_exact(&mut read_buf).unwrap(); // This may not work as expected
 
     println!("Read data 1: {:?}", &read_buf[..data.len()]);
-    Ok(())
 }
 
 use libc::{free, posix_memalign};
 use std::os::unix::io::AsRawFd;
 
-fn test2() -> Result<(), Error> {
+fn test2() {
     // Path to the file
     let time = unsafe { libc::time(ptr::null_mut()) };
     let path = format!("testfile2_{}", time);
@@ -70,7 +70,8 @@ fn test2() -> Result<(), Error> {
         .create(true)
         .truncate(false)
         .custom_flags(libc::O_DIRECT)
-        .open(&path)?;
+        .open(&path)
+        .unwrap();
 
     // Get the raw file descriptor
     let fd = file.as_raw_fd();
@@ -85,7 +86,7 @@ fn test2() -> Result<(), Error> {
         )
     };
     if ret != 0 {
-        return Err(Error::last_os_error());
+        return Err(Error::last_os_error()).unwrap();
     }
 
     unsafe {
@@ -101,11 +102,11 @@ fn test2() -> Result<(), Error> {
         let ret = write(fd, buf as *const c_void, block_size);
         if ret < 0 {
             free(buf as *mut c_void);
-            return Err(Error::last_os_error());
+            return Err(Error::last_os_error()).unwrap();
         }
 
         // Seek to the beginning of the file
-        file.seek(SeekFrom::Start(0))?;
+        file.seek(SeekFrom::Start(0)).unwrap();
 
         // Clear the buffer before reading
         ptr::write_bytes(buf, 0, block_size);
@@ -114,7 +115,7 @@ fn test2() -> Result<(), Error> {
         let ret = read(fd, buf as *mut c_void, block_size);
         if ret < 0 {
             free(buf as *mut c_void);
-            return Err(Error::last_os_error());
+            return Err(Error::last_os_error()).unwrap();
         }
 
         // Convert the read data to a slice and print it
@@ -124,11 +125,9 @@ fn test2() -> Result<(), Error> {
         // Clean up
         free(buf as *mut c_void);
     }
-
-    Ok(())
 }
 
-fn test3() -> Result<(), Error> {
+fn test3() {
     unsafe {
         let time = libc::time(ptr::null_mut());
         let path = CString::new(format!("testfile3_{}", time)).unwrap();
@@ -136,7 +135,7 @@ fn test3() -> Result<(), Error> {
         // Open the file with O_DIRECT
         let fd = open(path.as_ptr(), O_CREAT | O_RDWR | O_DIRECT, 0o644);
         if fd < 0 {
-            return Err(Error::last_os_error());
+            return Err(Error::last_os_error()).unwrap();
         }
 
         // Block size (usually 4096 bytes)
@@ -146,7 +145,7 @@ fn test3() -> Result<(), Error> {
         let buf = libc::memalign(block_size, block_size);
         if buf.is_null() {
             close(fd);
-            return Err(Error::last_os_error());
+            return Err(Error::last_os_error()).unwrap();
         }
 
         // Prepare data to write
@@ -162,14 +161,14 @@ fn test3() -> Result<(), Error> {
         if ret < 0 {
             libc::free(buf);
             close(fd);
-            return Err(Error::last_os_error());
+            return Err(Error::last_os_error()).unwrap();
         }
 
         // Seek to the beginning of the file
         if lseek(fd, 0, SEEK_SET) < 0 {
             libc::free(buf);
             close(fd);
-            return Err(Error::last_os_error());
+            return Err(Error::last_os_error()).unwrap();
         }
 
         // Clear the buffer before reading
@@ -180,7 +179,7 @@ fn test3() -> Result<(), Error> {
         if ret < 0 {
             libc::free(buf);
             close(fd);
-            return Err(Error::last_os_error());
+            return Err(Error::last_os_error()).unwrap();
         }
 
         // Convert the read data to a slice and print it
@@ -191,11 +190,10 @@ fn test3() -> Result<(), Error> {
         libc::free(buf);
         close(fd);
     }
-    Ok(())
 }
 
 fn main() {
-    test1().unwrap();
-    test2().unwrap();
-    test3().unwrap();
+    test1();
+    test2();
+    test3();
 }
